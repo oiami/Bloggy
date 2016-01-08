@@ -42,4 +42,35 @@ post '/users' => sub {
 
 };
 
+get '/users' => sub {
+    my $data =  { 
+        id        => '1',
+        username  => 'Tom123',
+        firstname => 'Thomas',
+        lastname  => 'Muller',
+        email     => 'tommy12@example.com',
+        password  => 'PassWOrt' 
+    };
+    return [$data];
+};
+
+get 'users/:id' => sub {
+    my $id = param('id');
+    
+    unless ($id eq '1'){
+        status '400';
+        return { error => 'Cannot find user' };
+    }
+
+    my $data =  { 
+        id        => '1',
+        username  => 'Tom123',
+        firstname => 'Thomas',
+        lastname  => 'Muller',
+        email     => 'tommy12@example.com',
+        password  => 'PassWOrt' 
+    };
+    return $data;
+};
+
 true;

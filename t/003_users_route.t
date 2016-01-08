@@ -60,6 +60,31 @@ $res = $test->request(
 );
 is($res->code, 200, 'get correct successful response code');
 $content = from_json($res->content);
-is( $content->{message}, 'Data is valid', 'get response message when data is valid' );
+is($content->{message}, 'Data is valid', 'get response message when data is valid' );
+
+$res = $test->request(GET '/users');
+is($res->code, 200, 'get correct successful response code');
+$content = from_json($res->content);
+is($content->[0]->{id}, '1', 'Get ID of the first user');
+is($content->[0]->{username}, 'Tom123', 'Get username');
+is($content->[0]->{firstname}, 'Thomas', 'Get firstname');
+is($content->[0]->{lastname}, 'Muller', 'Get lastname');
+is($content->[0]->{email}, 'tommy12@example.com', 'Get email');
+
+
+$res = $test->request(GET '/users/ab');
+is($res->code, 400, 'Ger correct response code when id is incorrect');
+$content = from_json($res->content);
+is($content->{error}, 'Cannot find user', 'get error message when user ID is incorrect');
+
+$res = $test->request(GET '/users/1');
+is($res->code, 200, 'get correct successful response code');
+$content = from_json($res->content);
+is($content->{id}, '1', 'Get ID of the first user');
+is($content->{username}, 'Tom123', 'Get username');
+is($content->{firstname}, 'Thomas', 'Get firstname');
+is($content->{lastname}, 'Muller', 'Get lastname');
+is($content->{email}, 'tommy12@example.com', 'Get email');
+
 
 done_testing();
