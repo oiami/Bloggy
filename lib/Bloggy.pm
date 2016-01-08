@@ -5,6 +5,7 @@ use warnings;
 use Dancer2;
 use JSON::Schema::AsType;
 use Data::Dumper;
+set serializer => 'JSON';
 
 our $VERSION = '0.1';
 
@@ -14,14 +15,11 @@ get '/' => sub {
 
 post '/users' => sub {
     my $userdata = params;
+    my $content_type = request->header('Content-Type');
 
-    # my $userdata = {
-    #     username  => 'Tom123',
-    #     firstname => 'Thomas',
-    #     lastname  => 'Muller',
-    #     email     => 'tommy12@example.com',
-    #     password  => 'PassWort'
-    # };
+    unless ($content_type eq 'application/json'){
+        return { error => 'JSON data type is required' };
+    }
 
     my $schema = JSON::Schema::AsType->new( schema => {
         properties => {
@@ -34,13 +32,12 @@ post '/users' => sub {
         required => ['username', 'firstname', 'lastname', 'email', 'password']
     });
 
-
     if ($schema->check($userdata)){
-        return 'valid!!!!';
+        return { message => 'Data is valid' };
     } else {
         my $explain = $schema->validate($userdata);
         status '400';
-        return $explain;
+        return { error => $explain };
     }
 
 };
