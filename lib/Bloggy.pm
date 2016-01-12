@@ -193,5 +193,117 @@ del '/blogs/:id' => sub {
     return {};
 };
 
+post '/blogs/:blogid/posts' => sub {
+    my $postdata = params;
+
+    my $content_type = request->header('Content-Type');
+
+    unless (param('blogid') eq '1'){
+        status '400';
+        return { error => 'Cannot find blog ID' };
+    }
+
+    unless ($content_type eq 'application/json'){
+        return { error => 'JSON data type is required' };
+    }
+
+    my $schema = JSON::Schema::AsType->new( schema => {
+        properties => {
+            title   => { type => 'string' },
+            content => { type => 'string' }
+        },
+        required => ['title', 'content']
+    });
+
+    if ($schema->check($postdata)){
+        status '201';
+        return { message => 'Post data is valid and created' };
+    } else {
+        my $explain = $schema->validate($postdata);
+        status '400';
+        return { error => $explain };
+    }
+};
+
+get '/blogs/:blogid/posts' => sub {
+
+    unless (param('blogid') eq '1'){
+        status '400';
+        return { error => 'Cannot find blog ID' };
+    }
+
+    my $data =  {
+        id      => '1',
+        title   => 'Beef Steak',
+        content => 'These are ingredients',
+        blog   => {
+            id    => '1',
+            title => 'Easy Cooking Menu',
+        }
+    };
+    return [$data];
+};
+
+get '/blogs/:blogid/posts/:postid' => sub {
+
+    unless (param('blogid') eq '1'){
+        status '400';
+        return { error => 'Cannot find blog ID' };
+    }
+
+    unless (param('postid') eq '2') {
+        status '400';
+        return { error => 'Cannot find post ID' };
+    }
+
+    my $data =  {
+        id      => '2',
+        title   => 'Teriyaki Chicken',
+        content => 'These are ingredients',
+        blog   => {
+            id    => '1',
+            title => 'Easy Cooking Menu',
+        }
+    };
+    return $data;
+};
+
+put '/blogs/:blogid/posts/:postid' => sub {
+    my $new_userdata = params;
+
+    my $content_type = request->header('Content-Type') || '';
+
+    unless ($content_type eq 'application/json'){
+        status '400';
+        return { error => 'JSON data type is required' };
+    }
+
+    unless (param('blogid') eq '1'){
+        status '400';
+        return { error => 'Cannot find blog ID' };
+    }
+
+    unless (param('postid') eq '2'){
+        status '400';
+        return { error => 'Cannot find post ID' };
+    }
+
+    return { message => 'Post data is updated' };
+};
+
+del '/blogs/:blogid/posts/:postid' => sub {
+    unless (param('blogid') eq '1'){
+        status '400';
+        return { error => 'Cannot find blog ID' };
+    }
+
+    unless (param('postid') eq '2'){
+        status '400';
+        return { error => 'Cannot find post ID' };
+    }
+
+    status '204';
+    return {};
+};
 
 true;
