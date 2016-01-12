@@ -193,6 +193,8 @@ del '/blogs/:id' => sub {
     return {};
 };
 
+#====================Posts=======================================
+
 post '/blogs/:blogid/posts' => sub {
     my $postdata = params;
 
@@ -269,7 +271,7 @@ get '/blogs/:blogid/posts/:postid' => sub {
 };
 
 put '/blogs/:blogid/posts/:postid' => sub {
-    my $new_userdata = params;
+    my $new_postdata = params;
 
     my $content_type = request->header('Content-Type') || '';
 
@@ -300,6 +302,121 @@ del '/blogs/:blogid/posts/:postid' => sub {
     unless (param('postid') eq '2'){
         status '400';
         return { error => 'Cannot find post ID' };
+    }
+
+    status '204';
+    return {};
+};
+
+#=================Comments=================================
+
+post '/posts/:postid/comments' => sub {
+    my $postdata = params;
+
+    my $content_type = request->header('Content-Type');
+
+    unless (param('postid') eq '1'){
+        status '400';
+        return { error => 'Cannot find post ID' };
+    }
+
+    unless ($content_type eq 'application/json'){
+        return { error => 'JSON data type is required' };
+    }
+
+    my $schema = JSON::Schema::AsType->new( schema => {
+        properties => {
+            content => { type => 'string' },
+            author  => { type => 'integer' }
+        },
+        required => ['content', 'author']
+    });
+
+    if ($schema->check($postdata)){
+        status '201';
+        return { message => 'Comment data is valid and created' };
+    } else {
+        my $explain = $schema->validate($postdata);
+        status '400';
+        return { error => $explain };
+    }
+};
+
+get '/posts/:postid/comments' => sub {
+
+    unless (param('postid') eq '1'){
+        status '400';
+        return { error => 'Cannot find post ID' };
+    }
+
+    my $data =  {
+        id      => '1',
+        content => 'Looks tasty!',
+        author  => {
+            id  => '1',
+            firstname => 'Linda',
+            lastname  => 'Fischer'
+        }
+    };
+    return [$data];
+};
+
+get '/posts/:postid/comments/:commentid' => sub {
+
+    unless (param('postid') eq '1'){
+        status '400';
+        return { error => 'Cannot find post ID' };
+    }
+
+    unless (param('commentid') eq '2') {
+        status '400';
+        return { error => 'Cannot find comment ID' };
+    }
+
+    my $data =  {
+        id      => '2',
+        content => 'Looks tasty!',
+        author  => {
+            id  => '1',
+            firstname => 'Linda',
+            lastname  => 'Fischer'
+        }
+    };
+    return $data;
+};
+
+put '/posts/:postid/comments/:commentid' => sub {
+    my $new_comment = params;
+
+    my $content_type = request->header('Content-Type') || '';
+
+    unless ($content_type eq 'application/json'){
+        status '400';
+        return { error => 'JSON data type is required' };
+    }
+
+    unless (param('postid') eq '1'){
+        status '400';
+        return { error => 'Cannot find post ID' };
+    }
+
+    unless (param('commentid') eq '2'){
+        status '400';
+        return { error => 'Cannot find comment ID' };
+    }
+
+    return { message => 'Comment data is updated' };
+};
+
+del '/posts/:postid/comments/:commentid' => sub {
+    unless (param('postid') eq '1'){
+        status '400';
+        return { error => 'Cannot find post ID' };
+    }
+
+    unless (param('commentid') eq '2'){
+        status '400';
+        return { error => 'Cannot find comment ID' };
     }
 
     status '204';
