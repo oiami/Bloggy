@@ -21,3 +21,8 @@ show_errors: 1
 
 # print the banner
 startup_info: 1
+
+plugins:
+    Database:
+        driver: SQLite
+        database: 'bloggy.db'

@@ -1,6 +1,14 @@
 use strict;
 use warnings;
 
+BEGIN {
+    $ENV{BLOGGY} = 'test';
+    $ENV{DANCER_ENVIRONMENT} = $ENV{BLOGGY};
+    use lib 't/lib';
+    use BloggyTest;
+    BloggyTest->init_data();
+}
+
 use Bloggy;
 use Test::More;
 use Plack::Test;
@@ -67,10 +75,10 @@ $res = $test->request(GET '/users');
 is($res->code, 200, 'get correct successful response code');
 $content = from_json($res->content);
 is($content->[0]->{id}, '1', 'Get ID of the first user');
-is($content->[0]->{username}, 'Tom123', 'Get username');
-is($content->[0]->{firstname}, 'Thomas', 'Get firstname');
-is($content->[0]->{lastname}, 'Muller', 'Get lastname');
-is($content->[0]->{email}, 'tommy12@example.com', 'Get email');
+is($content->[0]->{username}, 'claus123', 'Get username');
+is($content->[0]->{firstname}, 'Claus', 'Get firstname');
+is($content->[0]->{lastname}, 'Hartmann', 'Get lastname');
+is($content->[0]->{email}, 'claus@example.com', 'Get email');
 
 
 $res = $test->request(GET '/users/ab');
@@ -78,20 +86,22 @@ is($res->code, 400, 'get correct response code when id is incorrect');
 $content = from_json($res->content);
 is($content->{error}, 'Cannot find user', 'get error message when user ID is incorrect');
 
-$res = $test->request(GET '/users/1');
+$res = $test->request(GET '/users/5');
 is($res->code, 200, 'get correct successful response code');
 $content = from_json($res->content);
-is($content->{id}, '1', 'Get ID of the first user');
+is($content->{id}, '5', 'Get ID of the first user');
 is($content->{username}, 'Tom123', 'Get username');
 is($content->{firstname}, 'Thomas', 'Get firstname');
 is($content->{lastname}, 'Muller', 'Get lastname');
 is($content->{email}, 'tommy12@example.com', 'Get email');
 
 my $new_userdata = {
-    firstname => 'Thomas',
-    lastname  => 'Muller-Fischer',
-    email     => 'tommy12@example.com',
-    password  => 'NewPassWord'
+    user => {
+        firstname => 'Thomas',
+        lastname  => 'Muller-Fischer',
+        email     => 'tommy12@example.com',
+        password  => 'NewPassWord'
+    }
 };
 $json_data = to_json($new_userdata);
 
@@ -103,13 +113,13 @@ is($res->code, 400, 'get correct error response code when ID is incorrect');
 $content = from_json($res->content);
 is($content->{error}, 'Cannot find user', 'get error message when user ID is incorrect');
 
-$res = $test->request(PUT '/users/1',
+$res = $test->request(PUT '/users/5',
     'Content' => $json_data
 );
 $content = from_json($res->content);
 is($content->{error}, 'JSON data type is required', 'get error message when type of data is incorrect');
 
-$res = $test->request(PUT '/users/1',
+$res = $test->request(PUT '/users/5',
     'Content_Type' => 'application/json',
     'Content' => $json_data
 );
@@ -123,8 +133,12 @@ is($res->code, 400, 'get correct error response code when ID is incorrect');
 $content = from_json($res->content);
 is($content->{error}, 'Cannot find user', 'get error message when user ID is incorrect');
 
-$res = $test->request(DELETE '/users/1');
+$res = $test->request(DELETE '/users/5');
 
 is($res->code, 204, 'get correct response code');
+
+END {
+    BloggyTest->rollback_data();
+}
 
 done_testing();

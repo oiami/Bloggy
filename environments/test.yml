@@ -18,4 +18,4 @@ no_server_tokens: 1
 plugins:
     Database:
         driver: SQLite
-        database: 'bloggy.db'
+        database: 't/data/bloggy.db'

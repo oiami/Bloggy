@@ -1,6 +1,14 @@
 use strict;
 use warnings;
 
+BEGIN {
+    $ENV{BLOGGY} = 'test';
+    $ENV{DANCER_ENVIRONMENT} = $ENV{BLOGGY};
+    use lib 't/lib';
+    use BloggyTest;
+    BloggyTest->init_data();
+}
+
 use Bloggy;
 use Test::More;
 use Plack::Test;
@@ -65,29 +73,23 @@ $res = $test->request(GET '/blogs');
 is($res->code, 200, 'get correct successful response code');
 $content = from_json($res->content);
 is($content->[0]->{id}, '1', 'get ID of the blog');
-is($content->[0]->{title}, 'Easy Cooking Menu', 'get title of the blog');
-is($content->[0]->{url}, 'easycookingmenu', 'get url of the blog');
-is($content->[0]->{author}->{id}, '1', "get ID of the blog's author");
-is($content->[0]->{author}->{firstname}, 'Thomas', "get firstname of the blog's author");
-is($content->[0]->{author}->{lastname}, 'Muller', "get lastname of the blog's author");
-is($content->[0]->{author}->{email}, 'tommy12@example.com', "get email of the blog's author");
-
+is($content->[0]->{title}, 'Cooking World', 'get title of the blog');
+is($content->[0]->{url}, 'cooking_world', 'get url of the blog');
+is($content->[0]->{author}, '2', "get ID of the blog's author");
 
 $res = $test->request(GET '/blogs/ab');
 is($res->code, 400, 'get correct response code when id is incorrect');
 $content = from_json($res->content);
 is($content->{error}, 'Cannot find blog ID', 'get error message when blog ID is incorrect');
 
-$res = $test->request(GET '/blogs/1');
+$res = $test->request(GET '/blogs/3');
 is($res->code, 200, 'get correct successful response code');
 $content = from_json($res->content);
-is($content->{id}, '1', 'Get ID of the blog');
+is($content->{id}, '3', 'Get ID of the blog');
 is($content->{title}, 'Easy Cooking Menu', 'get blog title');
 is($content->{url}, 'easycookingmenu', 'get url of the blog');
-is($content->{author}->{id}, '1', "get ID of the blog's author");
-is($content->{author}->{firstname}, 'Thomas', "get firstname of the blog's author");
-is($content->{author}->{lastname}, 'Muller', "get lastname of the blog's author");
-is($content->{author}->{email}, 'tommy12@example.com', "get email of the blog's author");
+is($content->{author}, '1', "get ID of the blog's author");
+
 
 my $new_blogdata = { 
     title => 'Super Easy Cooking Menu',
@@ -104,21 +106,20 @@ is($res->code, 400, 'get correct error response code when ID is incorrect');
 $content = from_json($res->content);
 is($content->{error}, 'Cannot find blog ID', 'get error message when blog ID is incorrect');
 
-$res = $test->request(PUT '/blogs/1',
+$res = $test->request(PUT '/blogs/3',
     'Content' => $json_data
 );
 is($res->code, 400, 'get correct error response code when header data type is incorrect');
 $content = from_json($res->content);
 is($content->{error}, 'JSON data type is required', 'get error message when data type is incorrect');
 
-$res = $test->request(PUT '/blogs/1',
+$res = $test->request(PUT '/blogs/3',
     'Content_Type' => 'application/json', 
     'Content' => $json_data
 ); 
 is($res->code, 200, 'get correct response code when data is successfully updated');
 $content = from_json($res->content);
 is($content->{message}, 'Blog data is updated', 'get response message when data is successfully updated');
-
 
 $res = $test->request(DELETE '/blogs/0');
 is($res->code, 400, 'get correct error response code when ID is incorrect');
@@ -127,5 +128,9 @@ is($content->{error}, 'Cannot find blog ID', 'get error message when blog ID is 
 
 $res = $test->request(DELETE '/blogs/1');
 is($res->code, 204, 'get correct response code');
+
+END {
+    BloggyTest->rollback_data();
+}
 
 done_testing();
