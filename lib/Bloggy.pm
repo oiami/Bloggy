@@ -3,15 +3,16 @@ use strict;
 use warnings;
 
 use Dancer2;
+use Dancer2::Plugin::Database;
 use JSON::Schema::AsType;
 use Data::Dumper;
 set serializer => 'JSON';
 
 our $VERSION = '0.1';
 
-get '/' => sub {
-    template 'index';
-};
+# get '/' => sub {
+#     template 'index';
+# };
 
 post '/users' => sub {
     my $userdata = params;
@@ -20,7 +21,7 @@ post '/users' => sub {
     unless ($content_type eq 'application/json'){
         return { error => 'JSON data type is required' };
     }
-
+    
     my $schema = JSON::Schema::AsType->new( schema => {
         properties => {
             username  => { type => 'string' },
@@ -33,6 +34,7 @@ post '/users' => sub {
     });
 
     if ($schema->check($userdata)){
+        database->quick_insert('user', $userdata);
         status '201';
         return { message => 'Data is valid and created' };
     } else {
@@ -44,60 +46,60 @@ post '/users' => sub {
 };
 
 get '/users' => sub {
-    my $data =  { 
-        id        => '1',
-        username  => 'Tom123',
-        firstname => 'Thomas',
-        lastname  => 'Muller',
-        email     => 'tommy12@example.com',
-        password  => 'PassWOrt' 
-    };
-    return [$data];
+    
+    my @users;
+    @users = database->quick_select('user', {});
+
+    return \@users;
 };
 
 get '/users/:id' => sub {
     my $id = param('id');
-    
-    unless ($id eq '1'){
+
+    my $user =  database->quick_select('user', { id => $id });
+
+    unless ($user){
         status '400';
         return { error => 'Cannot find user' };
     }
 
-    my $data =  { 
-        id        => '1',
-        username  => 'Tom123',
-        firstname => 'Thomas',
-        lastname  => 'Muller',
-        email     => 'tommy12@example.com',
-        password  => 'PassWOrt'
-    };
-    return $data;
+    return $user;
 };
 
 put '/users/:id' => sub {
-    my $new_userdata = params;
+    my $new_userdata = param('user');
 
-    my $content_type ||= request->header('Content-Type');
+    my $content_type = request->header('Content-Type') || "";
 
     unless ($content_type eq 'application/json'){
         return { error => 'JSON data type is required' };
     }
 
-    unless (param('id') eq '1'){
+    my $result = database->quick_update('user', { id => param('id') }, $new_userdata);
+
+    if ( $result == 1 ){
+        return { message => 'User data is updated' };
+    } else {
         status '400';
         return { error => 'Cannot find user' };
     }
 
-    return { message => 'User data is updated' };
+
 };
 
 del '/users/:id' => sub {
-    unless (param('id') eq '1') {
+
+    my $result = database->quick_delete('user', { id => param('id') });
+
+    if ($result == 1){
+        status '204';
+        return {};
+    }
+    else {
         status '400';
         return { error => 'Cannot find user' };
     }
-    status '204';
-    return {};
+
 };
 
 #=================Blog========================
@@ -120,6 +122,7 @@ post '/blogs' => sub {
     });
 
     if ($schema->check($blogdata)){
+        database->quick_insert('blog', $blogdata);
         status '201';
         return { message => 'Blog data is valid and created' };
     } else {
@@ -130,44 +133,27 @@ post '/blogs' => sub {
 };
 
 get '/blogs' => sub {
-    my $data =  {
-        id     => '1',
-        title  => 'Easy Cooking Menu',
-        url    => 'easycookingmenu',
-        author => {
-            id    => '1',
-            firstname => 'Thomas',
-            lastname  => 'Muller',
-            email     => 'tommy12@example.com'
-        }
-    };
-    return [$data];
+
+    my @blogs;
+    @blogs = database->quick_select('blog', {});
+
+    return \@blogs;
 };
 
 get '/blogs/:id' => sub {
     my $id = param('id');
 
-    unless ($id eq '1'){
+    my $data = database->quick_select('blog', { id => $id });
+    unless ($data){
         status '400';
         return { error => 'Cannot find blog ID' };
     }
 
-    my $data =  {
-        id     => '1',
-        title  => 'Easy Cooking Menu',
-        url    => 'easycookingmenu',
-        author => {
-            id    => '1',
-            firstname => 'Thomas',
-            lastname  => 'Muller',
-            email     => 'tommy12@example.com'
-        }
-    };
     return $data;
 };
 
 put '/blogs/:id' => sub {
-    my $new_userdata = params;
+    my $new_blogdata = params;
 
     my $content_type = request->header('Content-Type') || '';
 
@@ -176,34 +162,39 @@ put '/blogs/:id' => sub {
         return { error => 'JSON data type is required' };
     }
 
-    unless (param('id') eq '1'){
+    my $result = database->quick_update('blog', { id => param('id') }, $new_blogdata);
+   
+    if( $result == 1 ){
+        return { message => 'Blog data is updated' };
+    }
+    else {
         status '400';
         return { error => 'Cannot find blog ID' };
     }
 
-    return { message => 'Blog data is updated' };
 };
 
 del '/blogs/:id' => sub {
-    unless (param('id') eq '1') {
+
+    my $result = database->quick_delete('blog', { id => param('id') });
+
+    if( $result == 1 ){
+        status '204';
+        return {};
+    }
+    else {
         status '400';
         return { error => 'Cannot find blog ID' };
     }
-    status '204';
-    return {};
+
 };
 
 #====================Posts=======================================
 
-post '/blogs/:blogid/posts' => sub {
+post '/blogs/:blog/posts' => sub {
     my $postdata = params;
 
     my $content_type = request->header('Content-Type');
-
-    unless (param('blogid') eq '1'){
-        status '400';
-        return { error => 'Cannot find blog ID' };
-    }
 
     unless ($content_type eq 'application/json'){
         return { error => 'JSON data type is required' };
@@ -218,6 +209,7 @@ post '/blogs/:blogid/posts' => sub {
     });
 
     if ($schema->check($postdata)){
+        my $res = database->quick_insert('post', $postdata);
         status '201';
         return { message => 'Post data is valid and created' };
     } else {
@@ -228,49 +220,23 @@ post '/blogs/:blogid/posts' => sub {
 };
 
 get '/blogs/:blogid/posts' => sub {
+    my $blog_id = param('blogid');
 
-    unless (param('blogid') eq '1'){
-        status '400';
-        return { error => 'Cannot find blog ID' };
-    }
+    my @posts;
+    @posts = database->quick_select('post', { blog => $blog_id }); 
 
-    my $data =  {
-        id      => '1',
-        title   => 'Beef Steak',
-        content => 'These are ingredients',
-        blog   => {
-            id    => '1',
-            title => 'Easy Cooking Menu',
-        }
-    };
-    return [$data];
+    return \@posts;
 };
 
-get '/blogs/:blogid/posts/:postid' => sub {
+get '/blogs/:blog/posts/:id' => sub {
+    my $params = params;
+    
+    my $data = database->quick_select('post', $params);
 
-    unless (param('blogid') eq '1'){
-        status '400';
-        return { error => 'Cannot find blog ID' };
-    }
-
-    unless (param('postid') eq '2') {
-        status '400';
-        return { error => 'Cannot find post ID' };
-    }
-
-    my $data =  {
-        id      => '2',
-        title   => 'Teriyaki Chicken',
-        content => 'These are ingredients',
-        blog   => {
-            id    => '1',
-            title => 'Easy Cooking Menu',
-        }
-    };
     return $data;
 };
 
-put '/blogs/:blogid/posts/:postid' => sub {
+put '/blogs/:blog/posts/:id' => sub {
     my $new_postdata = params;
 
     my $content_type = request->header('Content-Type') || '';
@@ -280,32 +246,37 @@ put '/blogs/:blogid/posts/:postid' => sub {
         return { error => 'JSON data type is required' };
     }
 
-    unless (param('blogid') eq '1'){
-        status '400';
-        return { error => 'Cannot find blog ID' };
-    }
+    my $blog_id = param('blog');
+    my $post_id = param('id');
 
-    unless (param('postid') eq '2'){
-        status '400';
-        return { error => 'Cannot find post ID' };
+    my $result = database->quick_update('post', 
+        { id => $post_id, blog => $blog_id },
+        $new_postdata) || 0;
+    
+    if ($result == 1) {
+        return { message => 'Post data is updated' };
     }
-
-    return { message => 'Post data is updated' };
+    else {
+        status '400';
+        return { error => 'Cannot update data' };
+    }
 };
 
-del '/blogs/:blogid/posts/:postid' => sub {
-    unless (param('blogid') eq '1'){
-        status '400';
-        return { error => 'Cannot find blog ID' };
-    }
+del '/blogs/:blog/posts/:id' => sub {
+    my $blog_id = param('blog');
+    my $id      = param('id');
 
-    unless (param('postid') eq '2'){
-        status '400';
-        return { error => 'Cannot find post ID' };
+    my $result = database->quick_delete('post', {id => $id, blog => $blog_id});
+   
+    if ($result == 1){
+        status '204';
+        return {};
     }
-
-    status '204';
-    return {};
+    else {
+        status '400';
+        return { error => 'Cannot delete post' };
+    }
+   
 };
 
 #=================Comments=================================
