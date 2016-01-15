@@ -209,7 +209,7 @@ post '/blogs/:blog/posts' => sub {
     });
 
     if ($schema->check($postdata)){
-        my $res = database->quick_insert('post', $postdata);
+        database->quick_insert('post', $postdata);
         status '201';
         return { message => 'Post data is valid and created' };
     } else {
@@ -281,15 +281,10 @@ del '/blogs/:blog/posts/:id' => sub {
 
 #=================Comments=================================
 
-post '/posts/:postid/comments' => sub {
-    my $postdata = params;
+post '/posts/:post/comments' => sub {
+    my $commentdata = params;
 
     my $content_type = request->header('Content-Type');
-
-    unless (param('postid') eq '1'){
-        status '400';
-        return { error => 'Cannot find post ID' };
-    }
 
     unless ($content_type eq 'application/json'){
         return { error => 'JSON data type is required' };
@@ -303,95 +298,76 @@ post '/posts/:postid/comments' => sub {
         required => ['content', 'author']
     });
 
-    if ($schema->check($postdata)){
-        status '201';
-        return { message => 'Comment data is valid and created' };
+    if ($schema->check($commentdata)){
+        my $result = database->quick_insert('comment', $commentdata);
+        if ($result == 1){
+            status '201';
+            return { message => 'Comment data is valid and created' };
+        }
     } else {
-        my $explain = $schema->validate($postdata);
+        my $explain = $schema->validate($commentdata);
         status '400';
         return { error => $explain };
     }
 };
 
-get '/posts/:postid/comments' => sub {
-
-    unless (param('postid') eq '1'){
-        status '400';
-        return { error => 'Cannot find post ID' };
-    }
-
-    my $data =  {
-        id      => '1',
-        content => 'Looks tasty!',
-        author  => {
-            id  => '1',
-            firstname => 'Linda',
-            lastname  => 'Fischer'
-        }
-    };
-    return [$data];
+get '/posts/:post/comments' => sub {
+    my $post_id = param('post');
+    my @posts;
+    @posts = database->quick_select('comment', { post => $post_id });
+    return \@posts;
 };
 
-get '/posts/:postid/comments/:commentid' => sub {
+get '/posts/:post/comments/:id' => sub {
+    my $params = params;
 
-    unless (param('postid') eq '1'){
-        status '400';
-        return { error => 'Cannot find post ID' };
-    }
+    my $data = database->quick_select('comment', $params);
 
-    unless (param('commentid') eq '2') {
-        status '400';
-        return { error => 'Cannot find comment ID' };
-    }
-
-    my $data =  {
-        id      => '2',
-        content => 'Looks tasty!',
-        author  => {
-            id  => '1',
-            firstname => 'Linda',
-            lastname  => 'Fischer'
-        }
-    };
     return $data;
 };
 
-put '/posts/:postid/comments/:commentid' => sub {
+put '/posts/:post/comments/:id' => sub {
     my $new_comment = params;
 
-    my $content_type = request->header('Content-Type') || '';
+    my $content_type = request->header('Content-Type') || "";
 
     unless ($content_type eq 'application/json'){
         status '400';
         return { error => 'JSON data type is required' };
     }
+    
+    my $post_id = param('post');
+    my $comment_id = param('id');
 
-    unless (param('postid') eq '1'){
+    my $result = database->quick_update('comment', 
+        { id => $comment_id, post => $post_id },
+        $new_comment) || 0;
+    
+    if ($result == 1) {
+        return { message => 'Comment data is updated' };
+    }
+    else {
         status '400';
-        return { error => 'Cannot find post ID' };
+        return { error => 'Cannot update data' };
     }
 
-    unless (param('commentid') eq '2'){
-        status '400';
-        return { error => 'Cannot find comment ID' };
-    }
-
-    return { message => 'Comment data is updated' };
 };
 
-del '/posts/:postid/comments/:commentid' => sub {
-    unless (param('postid') eq '1'){
-        status '400';
-        return { error => 'Cannot find post ID' };
-    }
+del '/posts/:post/comments/:id' => sub {
+    my $post_id = param('post');
+    my $id      = param('id');
 
-    unless (param('commentid') eq '2'){
-        status '400';
-        return { error => 'Cannot find comment ID' };
+    my $result = database->quick_delete('comment', {id => $id, post => $post_id});
+   
+    if ($result == 1){
+        status '204';
+        return {};
     }
-
-    status '204';
-    return {};
+    else {
+        status '400';
+        return { error => 'Cannot delete comment' };
+    }
+   
 };
 
 true;
