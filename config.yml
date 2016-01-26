@@ -26,3 +26,9 @@ template: "simple"
 #     template_toolkit:
 #       start_tag: '<%'
 #       end_tag:   '%>'
+
+plugins:
+    'Auth::HTTP::Basic::DWIW':
+        realm: 'Access denied'
+        content:
+            error: 'Access denied'
