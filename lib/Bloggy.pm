@@ -4,6 +4,7 @@ use warnings;
 
 use Dancer2;
 use Dancer2::Plugin::Database;
+use Dancer2::Plugin::Auth::HTTP::Basic::DWIW;
 use JSON::Schema::AsType;
 use Data::Dumper;
 set serializer => 'JSON';
@@ -13,6 +14,24 @@ our $VERSION = '0.1';
 # get '/' => sub {
 #     template 'index';
 # };
+
+http_basic_auth_set_check_handler sub {
+    my $username = param('username') || "";
+    my $password = param('password') || "";
+
+    my $result = database->quick_select('user', {
+        username => $username, 
+        password => $password 
+    });
+
+    if ( $result ){
+        session userid => $result->{id};
+        return 1;
+    } else {
+        status '401';
+        halt({ error => 'Access denied'});
+    }
+};
 
 post '/users' => sub {
     my $userdata = params;
@@ -66,13 +85,20 @@ get '/users/:id' => sub {
     return $user;
 };
 
-put '/users/:id' => sub {
+put '/users/:id' => http_basic_auth required => sub {
     my $new_userdata = param('user');
+    my $userid = session('userid');
 
     my $content_type = request->header('Content-Type') || "";
 
     unless ($content_type eq 'application/json'){
         return { error => 'JSON data type is required' };
+    }
+
+    #user id from data should match user retrieve from data base
+    unless ( param('id') eq $userid ) {
+        status '400';
+        return { error => 'Cannot find user' };
     }
 
     my $result = database->quick_update('user', { id => param('id') }, $new_userdata);
@@ -81,15 +107,19 @@ put '/users/:id' => sub {
         return { message => 'User data is updated' };
     } else {
         status '400';
-        return { error => 'Cannot find user' };
+        return { error => 'Cannot update user' };
     }
-
-
 };
 
-del '/users/:id' => sub {
+del '/users/:id' => http_basic_auth required => sub {
 
     my $result = database->quick_delete('user', { id => param('id') });
+    my $userid = session('userid');
+    #user id from data should match user retrieve from data base
+    unless ( param('id') eq $userid ) {
+        status '400';
+        return { error => 'Cannot find user' };
+    }
 
     if ($result == 1){
         status '204';
@@ -97,26 +127,28 @@ del '/users/:id' => sub {
     }
     else {
         status '400';
-        return { error => 'Cannot find user' };
+        return { error => 'Cannot delete user' };
     }
 
 };
 
 #=================Blog========================
 
-post '/blogs' => sub {
-    my $blogdata = params;
+post '/blogs' => http_basic_auth required => sub {
+    my $blogdata = param('blog');
     my $content_type = request->header('Content-Type');
+    my $author = session('userid');
 
     unless ($content_type eq 'application/json'){
         return { error => 'JSON data type is required' };
     }
 
+    $blogdata->{author} = $author;
+
     my $schema = JSON::Schema::AsType->new( schema => {
         properties => {
             title  => { type => 'string' },
             url    => { type => 'string' },
-            author => { type => 'integer' },
         },
         required => ['title', 'url', 'author']
     });
@@ -152,8 +184,8 @@ get '/blogs/:id' => sub {
     return $data;
 };
 
-put '/blogs/:id' => sub {
-    my $new_blogdata = params;
+put '/blogs/:id' => http_basic_auth required => sub {
+    my $new_blogdata = param('blog');
 
     my $content_type = request->header('Content-Type') || '';
 
@@ -162,7 +194,13 @@ put '/blogs/:id' => sub {
         return { error => 'JSON data type is required' };
     }
 
-    my $result = database->quick_update('blog', { id => param('id') }, $new_blogdata);
+    #user should be owner of the blog in order to edit
+    my $author = session('userid');
+
+    my $result = database->quick_update('blog', { 
+        id     => param('id'), 
+        author => $author 
+    }, $new_blogdata);
    
     if( $result == 1 ){
         return { message => 'Blog data is updated' };
@@ -174,9 +212,13 @@ put '/blogs/:id' => sub {
 
 };
 
-del '/blogs/:id' => sub {
+del '/blogs/:id' => http_basic_auth required => sub {
 
-    my $result = database->quick_delete('blog', { id => param('id') });
+    my $author = session('userid');
+
+    my $result = database->quick_delete('blog', 
+        { id => param('id'), author => $author }
+    );
 
     if( $result == 1 ){
         status '204';
@@ -191,7 +233,7 @@ del '/blogs/:id' => sub {
 
 #====================Posts=======================================
 
-post '/blogs/:blog/posts' => sub {
+post '/blogs/:blog/posts' => http_basic_auth required => sub {
     my $postdata = params;
 
     my $content_type = request->header('Content-Type');
@@ -236,7 +278,7 @@ get '/blogs/:blog/posts/:id' => sub {
     return $data;
 };
 
-put '/blogs/:blog/posts/:id' => sub {
+put '/blogs/:blog/posts/:id' => http_basic_auth required => sub {
     my $new_postdata = params;
 
     my $content_type = request->header('Content-Type') || '';
@@ -262,7 +304,7 @@ put '/blogs/:blog/posts/:id' => sub {
     }
 };
 
-del '/blogs/:blog/posts/:id' => sub {
+del '/blogs/:blog/posts/:id' => http_basic_auth required => sub {
     my $blog_id = param('blog');
     my $id      = param('id');
 
@@ -281,7 +323,7 @@ del '/blogs/:blog/posts/:id' => sub {
 
 #=================Comments=================================
 
-post '/posts/:post/comments' => sub {
+post '/posts/:post/comments' => http_basic_auth required => sub {
     my $commentdata = params;
 
     my $content_type = request->header('Content-Type');
@@ -326,7 +368,7 @@ get '/posts/:post/comments/:id' => sub {
     return $data;
 };
 
-put '/posts/:post/comments/:id' => sub {
+put '/posts/:post/comments/:id' => http_basic_auth required => sub {
     my $new_comment = params;
 
     my $content_type = request->header('Content-Type') || "";
@@ -353,7 +395,7 @@ put '/posts/:post/comments/:id' => sub {
 
 };
 
-del '/posts/:post/comments/:id' => sub {
+del '/posts/:post/comments/:id' => http_basic_auth required => sub {
     my $post_id = param('post');
     my $id      = param('id');
 

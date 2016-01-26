@@ -60,7 +60,7 @@ is($res->code, 400, 'get correct error response code when data type is incorrect
 $content = from_json($res->content);
 like($content->{error}, qr/did not pass type constraint/, 'get error message when data type is incorrect');
 
-$userdata->{password} = 'PossWort';
+$userdata->{password} = 'PassWort';
 $json_data = to_json($userdata);
 $res = $test->request(
     POST '/users',
@@ -95,18 +95,22 @@ is($content->{firstname}, 'Thomas', 'Get firstname');
 is($content->{lastname}, 'Muller', 'Get lastname');
 is($content->{email}, 'tommy12@example.com', 'Get email');
 
+my $new_password = 'NewPassWord';
 my $new_userdata = {
+    username => 'Tom123',
+    password => 'PassWort',
     user => {
         firstname => 'Thomas',
         lastname  => 'Muller-Fischer',
         email     => 'tommy12@example.com',
-        password  => 'NewPassWord'
+        password  => $new_password
     }
 };
 $json_data = to_json($new_userdata);
 
 $res = $test->request(PUT '/users/0',
     'Content_Type' => 'application/json',
+    'Authorization' => 'Basic '.$new_userdata->{username} . $new_userdata->{password},
     'Content' => $json_data
 );
 is($res->code, 400, 'get correct error response code when ID is incorrect');
@@ -114,6 +118,7 @@ $content = from_json($res->content);
 is($content->{error}, 'Cannot find user', 'get error message when user ID is incorrect');
 
 $res = $test->request(PUT '/users/5',
+    'Authorization' => 'Basic '.$new_userdata->{username} . $new_userdata->{password},
     'Content' => $json_data
 );
 $content = from_json($res->content);
@@ -121,19 +126,29 @@ is($content->{error}, 'JSON data type is required', 'get error message when type
 
 $res = $test->request(PUT '/users/5',
     'Content_Type' => 'application/json',
-    'Content' => $json_data
+    'Content' => $json_data,
+    'Authorization' => 'Basic '.$new_userdata->{username} . $new_userdata->{password},
 );
 is($res->code, 200, 'get correct response code when data is successfully updated');
 $content = from_json($res->content);
 is($content->{message}, 'User data is updated', 'get response message when data is successfully updated');
 
-
-$res = $test->request(DELETE '/users/0');
+my $user = { username => 'Tom123', password => $new_password };
+$json_data = to_json($user);
+$res = $test->request(DELETE '/users/0', 
+    'Content_Type' => 'application/json',
+    'Content' => $json_data,
+    'Authorization' => 'Basic '.$new_userdata->{username} . $new_password,
+);
 is($res->code, 400, 'get correct error response code when ID is incorrect');
 $content = from_json($res->content);
 is($content->{error}, 'Cannot find user', 'get error message when user ID is incorrect');
 
-$res = $test->request(DELETE '/users/5');
+$res = $test->request(DELETE '/users/5',
+    'Content_Type' => 'application/json',
+    'Content' => $json_data,
+    'Authorization' => 'Basic '.$new_userdata->{username} . $new_password,
+);
 
 is($res->code, 204, 'get correct response code');
 
