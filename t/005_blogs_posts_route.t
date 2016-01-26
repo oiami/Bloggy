@@ -23,22 +23,27 @@ is( ref $app, 'CODE', 'Got app' );
 
 my $test = Plack::Test->create($app);
 
-my $postdata =  { 
-    title  => 'Beef Steak',
-    blog   => 2,
+my $postdata =  {
+    post => { 
+        title    => 'Beef Steak'
+    },
+    username => 'claus123',
+    password => 'rh90mcvcsm9s'
 };
 
 my $json_data = to_json($postdata);
 my $res = $test->request( 
-    POST '/blogs/1/posts',
-    'Content' => $json_data
+    POST '/blogs/2/posts',
+    'Content' => $json_data,
+    'Authorization' => 'Basic '.$postdata->{username} . $postdata->{password},
 );
 my $content = from_json($res->content);
 is($content->{error}, 'JSON data type is required', 'get error message when type of data is incorrect');
 
 $res = $test->request( 
-    POST '/blogs/1/posts',
-    'Content_Type' => 'application/json', 
+    POST '/blogs/2/posts',
+    'Content_Type' => 'application/json',
+    'Authorization' => 'Basic '.$postdata->{username} . $postdata->{password}, 
     'Content' => $json_data
 );
 
@@ -50,8 +55,9 @@ $postdata->{content} = '123';
 
 $json_data = to_json($postdata);
 $res = $test->request( 
-    POST '/blogs/1/posts',
-    'Content_Type' => 'application/json', 
+    POST '/blogs/2/posts',
+    'Content_Type' => 'application/json',
+    'Authorization' => 'Basic '.$postdata->{username} . $postdata->{password}, 
     'Content' => $json_data
 );
 
@@ -59,11 +65,12 @@ is($res->code, 400, 'get correct error response code when data type is incorrect
 $content = from_json($res->content);
 like($content->{error}, qr/did not pass type constraint/, 'get error message when data type is incorrect');
 
-$postdata->{content} = 'These are ingredients';
+$postdata->{post}->{content} = 'These are ingredients';
 $json_data = to_json($postdata);
 $res = $test->request(
-    POST '/blogs/1/posts',
-    'Content_Type' => 'application/json', 
+    POST '/blogs/2/posts',
+    'Content_Type' => 'application/json',
+    'Authorization' => 'Basic '.$postdata->{username} . $postdata->{password}, 
     'Content' => $json_data
 );
 is($res->code, 201, 'get correct successful response code');
@@ -78,23 +85,23 @@ is($content->[0]->{title}, 'Amazing Thailand', 'get title of the post');
 is($content->[0]->{content}, 'My amazing trip to Thailand.', 'get title of the blog');
 is($content->[0]->{blog}, '2', "get ID of the post's blog");
 
-$res = $test->request(GET '/blogs/1/posts/2');
+$res = $test->request(GET '/blogs/2/posts/2');
 is($res->code, 200, 'get correct successful response code');
 $content = from_json($res->content);
 is($content->{id}, '2', 'Get ID of the post');
 is($content->{title}, 'Beef Steak', 'get post title');
 is($content->{content}, 'These are ingredients', 'get the content of the post');
-is($content->{blog}, '1', "get ID of the post's blog");
+is($content->{blog}, '2', "get ID of the post's blog");
 
-my $new_postdata = { 
+$postdata->{post} = {
     title   => 'Japanese Teriyaki Chicken',
     content => 'Soy sauce is one of ingredients',
 };
 
-$json_data = to_json($new_postdata);
-
+$json_data = to_json($postdata);
 $res = $test->request(PUT '/blogs/0/posts/0',
-    'Content_Type' => 'application/json', 
+    'Content_Type'  => 'application/json',
+    'Authorization' => 'Basic '.$postdata->{username} . $postdata->{password},  
     'Content' => $json_data
 );
 is($res->code, 400, 'get correct error response code when ID is incorrect');
@@ -102,26 +109,34 @@ $content = from_json($res->content);
 is($content->{error}, 'Cannot update data', 'get error message when blog ID is incorrect');
 
 $res = $test->request(PUT '/blogs/1/posts/2',
+    'Authorization' => 'Basic '.$postdata->{username} . $postdata->{password}, 
     'Content' => $json_data
 );
 is($res->code, 400, 'get correct error response code when header data type is incorrect');
 $content = from_json($res->content);
 is($content->{error}, 'JSON data type is required', 'get error message when data type is incorrect');
 
-$res = $test->request(PUT '/blogs/1/posts/2',
-    'Content_Type' => 'application/json', 
+$res = $test->request(PUT '/blogs/2/posts/2',
+    'Content_Type' => 'application/json',
+    'Authorization' => 'Basic '.$postdata->{username} . $postdata->{password},   
     'Content' => $json_data
 ); 
 is($res->code, 200, 'get correct response code when data is successfully updated');
 $content = from_json($res->content);
 is($content->{message}, 'Post data is updated', 'get response message when data is successfully updated');
 
-$res = $test->request(DELETE '/blogs/0/posts/1');
+$res = $test->request(DELETE '/blogs/0/posts/1', 
+    'Authorization' => 'Basic '.$postdata->{username} . $postdata->{password},   
+    'Content' => $json_data
+);
 is($res->code, 400, 'get correct error response code when ID is incorrect');
 $content = from_json($res->content);
 is($content->{error}, 'Cannot delete post', 'get error message when blog ID is incorrect');
 
-$res = $test->request(DELETE '/blogs/1/posts/2');
+$res = $test->request(DELETE '/blogs/2/posts/2',
+    'Authorization' => 'Basic '.$postdata->{username} . $postdata->{password},
+    'Content' => $json_data   
+);
 is($res->code, 204, 'get correct response code');
 
 END {

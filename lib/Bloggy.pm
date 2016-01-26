@@ -233,8 +233,8 @@ del '/blogs/:id' => http_basic_auth required => sub {
 
 #====================Posts=======================================
 
-post '/blogs/:blog/posts' => http_basic_auth required => sub {
-    my $postdata = params;
+post '/blogs/:blogid/posts' => http_basic_auth required => sub {
+    my $postdata = param('post');
 
     my $content_type = request->header('Content-Type');
 
@@ -242,12 +242,17 @@ post '/blogs/:blog/posts' => http_basic_auth required => sub {
         return { error => 'JSON data type is required' };
     }
 
+    my $author = session('userid');
+    my $blog = database->quick_select('blog', { id => param('blogid'), author => $author });
+    $postdata->{blog} = $blog->{id};
+
     my $schema = JSON::Schema::AsType->new( schema => {
         properties => {
             title   => { type => 'string' },
-            content => { type => 'string' }
+            content => { type => 'string' },
+            blog    => { type => 'integer' },
         },
-        required => ['title', 'content']
+        required => ['title', 'content', 'blog']
     });
 
     if ($schema->check($postdata)){
@@ -270,16 +275,21 @@ get '/blogs/:blogid/posts' => sub {
     return \@posts;
 };
 
-get '/blogs/:blog/posts/:id' => sub {
+get '/blogs/:blogid/posts/:id' => sub {
     my $params = params;
     
-    my $data = database->quick_select('post', $params);
+    my $data = database->quick_select('post', { blog => param('blogid'), id => param('id') });
+
+    unless ($data){
+        status '400';
+        return { error => 'Cannot find post ID' };
+    }
 
     return $data;
 };
 
-put '/blogs/:blog/posts/:id' => http_basic_auth required => sub {
-    my $new_postdata = params;
+put '/blogs/:blogid/posts/:id' => http_basic_auth required => sub {
+    my $new_postdata = param('post');
 
     my $content_type = request->header('Content-Type') || '';
 
@@ -288,7 +298,10 @@ put '/blogs/:blog/posts/:id' => http_basic_auth required => sub {
         return { error => 'JSON data type is required' };
     }
 
-    my $blog_id = param('blog');
+    my $author = session('userid');
+    my $blog = database->quick_select('blog', { id => param('blogid'), author => $author });
+    
+    my $blog_id = $blog->{id};
     my $post_id = param('id');
 
     my $result = database->quick_update('post', 
@@ -304,11 +317,13 @@ put '/blogs/:blog/posts/:id' => http_basic_auth required => sub {
     }
 };
 
-del '/blogs/:blog/posts/:id' => http_basic_auth required => sub {
-    my $blog_id = param('blog');
-    my $id      = param('id');
+del '/blogs/:blogid/posts/:id' => http_basic_auth required => sub {
+    my $author = session('userid');
 
-    my $result = database->quick_delete('post', {id => $id, blog => $blog_id});
+    my $blog = database->quick_select('blog', { id => param('blogid'), author => $author });
+    my $blog_id = $blog->{id};
+
+    my $result = database->quick_delete('post', { id => param('id'), blog => $blog_id });
    
     if ($result == 1){
         status '204';
