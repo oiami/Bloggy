@@ -338,8 +338,11 @@ del '/blogs/:blogid/posts/:id' => http_basic_auth required => sub {
 
 #=================Comments=================================
 
-post '/posts/:post/comments' => http_basic_auth required => sub {
-    my $commentdata = params;
+post '/posts/:postid/comments' => http_basic_auth required => sub {
+    my $commentdata = param('comment');
+
+    $commentdata->{author} = session('userid');
+    $commentdata->{post}   = param('postid');
 
     my $content_type = request->header('Content-Type');
 
@@ -350,9 +353,10 @@ post '/posts/:post/comments' => http_basic_auth required => sub {
     my $schema = JSON::Schema::AsType->new( schema => {
         properties => {
             content => { type => 'string' },
-            author  => { type => 'integer' }
+            author  => { type => 'integer' },
+            post    => { type => 'integer' },
         },
-        required => ['content', 'author']
+        required => ['content', 'author', 'post']
     });
 
     if ($schema->check($commentdata)){
@@ -384,7 +388,11 @@ get '/posts/:post/comments/:id' => sub {
 };
 
 put '/posts/:post/comments/:id' => http_basic_auth required => sub {
-    my $new_comment = params;
+    my $new_comment = param('comment');
+
+    my $post_id    = param('post');
+    my $comment_id = param('id');
+    my $author     = session('userid');
 
     my $content_type = request->header('Content-Type') || "";
 
@@ -392,14 +400,11 @@ put '/posts/:post/comments/:id' => http_basic_auth required => sub {
         status '400';
         return { error => 'JSON data type is required' };
     }
-    
-    my $post_id = param('post');
-    my $comment_id = param('id');
 
-    my $result = database->quick_update('comment', 
-        { id => $comment_id, post => $post_id },
+    my $result = database->quick_update('comment',
+        { id => $comment_id, post => $post_id, author => $author },
         $new_comment) || 0;
-    
+
     if ($result == 1) {
         return { message => 'Comment data is updated' };
     }
@@ -413,9 +418,12 @@ put '/posts/:post/comments/:id' => http_basic_auth required => sub {
 del '/posts/:post/comments/:id' => http_basic_auth required => sub {
     my $post_id = param('post');
     my $id      = param('id');
+    my $author  = session('userid');
 
-    my $result = database->quick_delete('comment', {id => $id, post => $post_id});
-   
+    my $result = database->quick_delete('comment',
+        {id => $id, post => $post_id, author => $author }
+    );
+
     if ($result == 1){
         status '204';
         return {};
