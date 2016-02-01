@@ -5,7 +5,7 @@ use warnings;
 use Dancer2;
 use Dancer2::Plugin::Database;
 use Dancer2::Plugin::Auth::HTTP::Basic::DWIW;
-use JSON::Schema::AsType;
+# use JSON::Schema::AsType;
 use Data::Dumper;
 set serializer => 'JSON';
 
@@ -41,26 +41,26 @@ post '/users' => sub {
         return { error => 'JSON data type is required' };
     }
     
-    my $schema = JSON::Schema::AsType->new( schema => {
-        properties => {
-            username  => { type => 'string' },
-            firstname => { type => 'string' },
-            lastname  => { type => 'string' },
-            email     => { type => 'string' },
-            password  => { type => 'string' }
-        },
-        required => ['username', 'firstname', 'lastname', 'email', 'password']
-    });
+    # my $schema = JSON::Schema::AsType->new( schema => {
+    #     properties => {
+    #         username  => { type => 'string' },
+    #         firstname => { type => 'string' },
+    #         lastname  => { type => 'string' },
+    #         email     => { type => 'string' },
+    #         password  => { type => 'string' }
+    #     },
+    #     required => ['username', 'firstname', 'lastname', 'email', 'password']
+    # });
 
-    if ($schema->check($userdata)){
+    # if ($schema->check($userdata)){
         database->quick_insert('user', $userdata);
         status '201';
         return { message => 'Data is valid and created' };
-    } else {
-        my $explain = $schema->validate($userdata);
-        status '400';
-        return { error => $explain };
-    }
+    # } else {
+    #     my $explain = $schema->validate($userdata);
+    #     status '400';
+    #     return { error => $explain };
+    # }
 
 };
 
@@ -145,23 +145,23 @@ post '/blogs' => http_basic_auth required => sub {
 
     $blogdata->{author} = $author;
 
-    my $schema = JSON::Schema::AsType->new( schema => {
-        properties => {
-            title  => { type => 'string' },
-            url    => { type => 'string' },
-        },
-        required => ['title', 'url', 'author']
-    });
+    # my $schema = JSON::Schema::AsType->new( schema => {
+    #     properties => {
+    #         title  => { type => 'string' },
+    #         url    => { type => 'string' },
+    #     },
+    #     required => ['title', 'url', 'author']
+    # });
 
-    if ($schema->check($blogdata)){
+    # if ($schema->check($blogdata)){
         database->quick_insert('blog', $blogdata);
         status '201';
         return { message => 'Blog data is valid and created' };
-    } else {
-        my $explain = $schema->validate($blogdata);
-        status '400';
-        return { error => $explain };
-    }
+    # } else {
+    #     my $explain = $schema->validate($blogdata);
+    #     status '400';
+    #     return { error => $explain };
+    # }
 };
 
 get '/blogs' => sub {
@@ -246,24 +246,24 @@ post '/blogs/:blogid/posts' => http_basic_auth required => sub {
     my $blog = database->quick_select('blog', { id => param('blogid'), author => $author });
     $postdata->{blog} = $blog->{id};
 
-    my $schema = JSON::Schema::AsType->new( schema => {
-        properties => {
-            title   => { type => 'string' },
-            content => { type => 'string' },
-            blog    => { type => 'integer' },
-        },
-        required => ['title', 'content', 'blog']
-    });
+    # my $schema = JSON::Schema::AsType->new( schema => {
+    #     properties => {
+    #         title   => { type => 'string' },
+    #         content => { type => 'string' },
+    #         blog    => { type => 'integer' },
+    #     },
+    #     required => ['title', 'content', 'blog']
+    # });
 
-    if ($schema->check($postdata)){
+    # if ($schema->check($postdata)){
         database->quick_insert('post', $postdata);
         status '201';
         return { message => 'Post data is valid and created' };
-    } else {
-        my $explain = $schema->validate($postdata);
-        status '400';
-        return { error => $explain };
-    }
+    # } else {
+    #     my $explain = $schema->validate($postdata);
+    #     status '400';
+    #     return { error => $explain };
+    # }
 };
 
 get '/blogs/:blogid/posts' => sub {
@@ -350,26 +350,26 @@ post '/posts/:postid/comments' => http_basic_auth required => sub {
         return { error => 'JSON data type is required' };
     }
 
-    my $schema = JSON::Schema::AsType->new( schema => {
-        properties => {
-            content => { type => 'string' },
-            author  => { type => 'integer' },
-            post    => { type => 'integer' },
-        },
-        required => ['content', 'author', 'post']
-    });
+    # my $schema = JSON::Schema::AsType->new( schema => {
+    #     properties => {
+    #         content => { type => 'string' },
+    #         author  => { type => 'integer' },
+    #         post    => { type => 'integer' },
+    #     },
+    #     required => ['content', 'author', 'post']
+    # });
 
-    if ($schema->check($commentdata)){
+    # if ($schema->check($commentdata)){
         my $result = database->quick_insert('comment', $commentdata);
         if ($result == 1){
             status '201';
             return { message => 'Comment data is valid and created' };
         }
-    } else {
-        my $explain = $schema->validate($commentdata);
-        status '400';
-        return { error => $explain };
-    }
+    # } else {
+    #     my $explain = $schema->validate($commentdata);
+    #     status '400';
+    #     return { error => $explain };
+    # }
 };
 
 get '/posts/:post/comments' => sub {
