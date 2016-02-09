@@ -419,12 +419,24 @@ del '/posts/:post/comments/:id' => http_basic_auth required => sub {
     my $post_id = param('post');
     my $id      = param('id');
     my $author  = session('userid');
+    my $deleted = 0;
 
-    my $result = database->quick_delete('comment',
-        {id => $id, post => $post_id, author => $author }
-    );
+    my $post = database->quick_select('post', { id => $post_id });
 
-    if ($result == 1){
+    if ( $post ){
+        my $result = database->quick_select('blog', { id => $post->{blog}, author => $author });
+        if ($result){
+            $deleted = database->quick_delete('comment',
+                {id => $id, post => $post_id }
+            );
+        }
+    } else {
+        $deleted = database->quick_delete('comment',
+            {id => $id, post => $post_id, author => $author }
+        );
+    }
+
+    if ($deleted == 1){
         status '204';
         return {};
     }

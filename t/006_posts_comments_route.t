@@ -31,7 +31,6 @@ my $comment =  {
     }
 };
 
-warn Dumper($comment);
 my $json_data = to_json($comment);
 my $res = $test->request( 
     POST '/posts/1/comments',
@@ -127,15 +126,23 @@ $res = $test->request(DELETE '/posts/1/comments/1',
     'Authorization' => 'Basic '.$comment->{username} . $comment->{password}, 
     'Content' => $json_data
 );
-is($res->code, 400, 'get correct error response code when ID is incorrect');
-$content = from_json($res->content);
-is($content->{error}, 'Cannot delete comment', 'get error message when comment ID is incorrect');
+is($res->code, 204, 'get correct code: blog owner should be able to remove comments');
 
 $res = $test->request(DELETE '/posts/1/comments/2',
     'Authorization' => 'Basic '.$comment->{username} . $comment->{password}, 
     'Content' => $json_data
 );
 is($res->code, 204, 'get correct response code');
+
+my $user_anna = { username => 'anna456', password => 'soqyovlk' };
+$json_data = to_json($user_anna);
+$res = $test->request(DELETE '/posts/1/comments/3',
+    'Authorization' => 'Basic '.$user_anna->{username} . $user_anna->{password}, 
+    'Content' => $json_data
+);
+$content = from_json($res->content);
+is($res->code, 400, 'get correct response code: either author or blog user can remove comment');
+is($content->{error}, 'Cannot delete comment', 'get error message when comment ID is incorrect');
 
 END {
     BloggyTest->rollback_data();
