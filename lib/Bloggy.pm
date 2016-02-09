@@ -421,15 +421,16 @@ del '/posts/:post/comments/:id' => http_basic_auth required => sub {
     my $author  = session('userid');
     my $deleted = 0;
 
-    my $post = database->quick_select('post', { id => $post_id });
+    my $sth = database->prepare(
+        'SELECT * FROM blog JOIN post on blog.id=post.blog WHERE blog.author = ? AND post.id = ?'
+    );
+    $sth->execute($author, $post_id);
+    my $result = $sth->fetchrow_hashref;
 
-    if ( $post ){
-        my $result = database->quick_select('blog', { id => $post->{blog}, author => $author });
-        if ($result){
-            $deleted = database->quick_delete('comment',
-                {id => $id, post => $post_id }
-            );
-        }
+    if ( $result ){
+        $deleted = database->quick_delete('comment',
+            {id => $id, post => $post_id }
+        );
     } else {
         $deleted = database->quick_delete('comment',
             {id => $id, post => $post_id, author => $author }
