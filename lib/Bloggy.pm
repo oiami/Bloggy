@@ -7,6 +7,8 @@ use Dancer2::Plugin::Database;
 use Dancer2::Plugin::Auth::HTTP::Basic::DWIW;
 use JSON::Schema::AsType;
 use Data::Dumper;
+use OAuth::Lite::Token;
+
 set serializer => 'JSON';
 
 our $VERSION = '0.1';
@@ -14,6 +16,21 @@ our $VERSION = '0.1';
 # get '/' => sub {
 #     template 'index';
 # };
+
+get '/auth/token' => sub {
+
+    my $result = database->quick_select('user', {
+        username => param('username'), 
+        password => param('password') 
+    });
+
+    if( $result ){
+       my $token = OAuth::Lite::Token->new_random;
+       return { token => $token->token, secret => $token->secret };
+    } else {
+        return({ error => 'User is unautorized' });
+    }
+};
 
 http_basic_auth_set_check_handler sub {
     my $username = param('username') || "";
