@@ -15,7 +15,7 @@ my $res  = $test->request( GET '/' );
 my $user_anna = { username => 'anna456', password => 'soqyovlk' };
 
 my $json_data = to_json($user_anna);
-$res = $test->request(GET '/auth/token',
+$res = $test->request(POST '/auth/token',
     'Content_Type'  => 'application/json', 
     'Content' => $json_data
 );
