@@ -4,9 +4,11 @@ use warnings;
 
 use Dancer2;
 use Dancer2::Plugin::Database;
-use Dancer2::Plugin::Auth::HTTP::Basic::DWIW;
 use JSON::Schema::AsType;
+use JSON::WebToken;
 use Data::Dumper;
+use DateTime;
+
 set serializer => 'JSON';
 
 our $VERSION = '0.1';
@@ -15,23 +17,92 @@ our $VERSION = '0.1';
 #     template 'index';
 # };
 
-http_basic_auth_set_check_handler sub {
-    my $username = param('username') || "";
-    my $password = param('password') || "";
+post '/login' => sub {
 
     my $result = database->quick_select('user', {
-        username => $username, 
-        password => $password 
+        username => param('username'), 
+        password => param('password') 
     });
 
+    my $dt = DateTime->now()->add( days => 1 );
+    $dt = $dt->epoch;
+
     if ( $result ){
-        session userid => $result->{id};
-        return 1;
+        my $jwt = JSON::WebToken->encode({
+            id        => $result->{id},
+            firstname => $result->{firstname},
+            lastname  => $result->{lastname},
+            exp       => $dt,
+        }, $result->{email});
+
+        return { token => $jwt };
     } else {
         status '401';
-        halt({ error => 'Access denied'});
+        halt({ error => 'Unauthorized user'});
     }
+
 };
+
+sub _validate_request {
+    my $request = shift;
+    my $authorization = $request->headers->{'authorization'};
+    my ($auth_method, $token) = split(' ', $authorization);
+    
+    if( $auth_method ne 'Bearer' ){
+        status 400;
+        halt({ error => 'Unauthorized' });
+    }
+    
+    my $secret = $request->param('secret');
+
+    eval {
+        my $claims = JSON::WebToken->decode( $token, $secret );
+        my $now = DateTime->now()->add(days => 2)->epoch;
+        my $exp = $claims->{exp};
+
+        if($now <= $exp){
+            status '400';
+            halt({ error => 'Token Expired' });
+        }
+        print Dumper($claims);
+        return $claims->{id}; 
+    };
+    if ($@) {
+        status 500;
+        halt({ error => "$@" });
+    }
+}
+
+post '/signin' => sub {
+    my $token = param('token');
+    my $secret = param('secret');
+
+    my $id = _validate_request(request);
+    
+    if( validate_request($token, $secret )){
+        return { claims => 'ok' };
+    }
+
+    # return { claim => $claims };
+};
+
+# http_basic_auth_set_check_handler sub {
+#     my $username = param('username') || "";
+#     my $password = param('password') || "";
+
+#     my $result = database->quick_select('user', {
+#         username => $username, 
+#         password => $password 
+#     });
+
+#     if ( $result ){
+#         session userid => $result->{id};
+#         return 1;
+#     } else {
+#         status '401';
+#         halt({ error => 'Access denied'});
+#     }
+# };
 
 post '/users' => sub {
     my $userdata = params;
@@ -85,29 +156,31 @@ get '/users/:id' => sub {
     return $user;
 };
 
-put '/users/:id' => http_basic_auth required => sub {
+put '/users/:id' => sub {
     my $new_userdata = param('user');
-    my $userid = session('userid');
+    my $userid = _validate_request(request);
 
-    my $content_type = request->header('Content-Type') || "";
+    if( $userid ){
+        my $content_type = request->header('Content-Type') || "";
 
-    unless ($content_type eq 'application/json'){
-        return { error => 'JSON data type is required' };
-    }
+        unless ($content_type eq 'application/json'){
+            return { error => 'JSON data type is required' };
+        }
 
-    #user id from data should match user retrieve from data base
-    unless ( param('id') eq $userid ) {
-        status '400';
-        return { error => 'Cannot find user' };
-    }
+        #user id from data should match user retrieve from data base
+        unless ( param('id') eq $userid ) {
+            status '400';
+            return { error => 'Cannot find user' };
+        }
 
-    my $result = database->quick_update('user', { id => param('id') }, $new_userdata);
+        my $result = database->quick_update('user', { id => param('id') }, $new_userdata);
 
-    if ( $result == 1 ){
-        return { message => 'User data is updated' };
-    } else {
-        status '400';
-        return { error => 'Cannot update user' };
+        if ( $result == 1 ){
+            return { message => 'User data is updated' };
+        } else {
+            status '400';
+            return { error => 'Cannot update user' };
+        }
     }
 };
 

@@ -95,10 +95,20 @@ is($content->{firstname}, 'Thomas', 'Get firstname');
 is($content->{lastname}, 'Muller', 'Get lastname');
 is($content->{email}, 'tommy12@example.com', 'Get email');
 
+my $secret = $content->{email};
+$json_data = to_json({ username => $userdata->{username}, password => $userdata->{password} });
+$res = $test->request(
+    POST '/login',
+    'Content_Type' => 'application/json', 
+    'Content' => $json_data
+);
+# print Dumper($res);
+$content = from_json($res->content);
+my $token = $content->{token};
+print $token;
 my $new_password = 'NewPassWord';
 my $new_userdata = {
-    username => 'Tom123',
-    password => 'PassWort',
+    secret => $secret,
     user => {
         firstname => 'Thomas',
         lastname  => 'Muller-Fischer',
@@ -110,7 +120,7 @@ $json_data = to_json($new_userdata);
 
 $res = $test->request(PUT '/users/0',
     'Content_Type' => 'application/json',
-    'Authorization' => 'Basic '.$new_userdata->{username} . $new_userdata->{password},
+    'Authorization' => 'Bearer '.$token,
     'Content' => $json_data
 );
 is($res->code, 400, 'get correct error response code when ID is incorrect');
@@ -118,7 +128,7 @@ $content = from_json($res->content);
 is($content->{error}, 'Cannot find user', 'get error message when user ID is incorrect');
 
 $res = $test->request(PUT '/users/5',
-    'Authorization' => 'Basic '.$new_userdata->{username} . $new_userdata->{password},
+    'Authorization' => 'Bearer '.$token,
     'Content' => $json_data
 );
 $content = from_json($res->content);
@@ -127,30 +137,30 @@ is($content->{error}, 'JSON data type is required', 'get error message when type
 $res = $test->request(PUT '/users/5',
     'Content_Type' => 'application/json',
     'Content' => $json_data,
-    'Authorization' => 'Basic '.$new_userdata->{username} . $new_userdata->{password},
+    'Authorization' => 'Bearer '.$token,
 );
 is($res->code, 200, 'get correct response code when data is successfully updated');
 $content = from_json($res->content);
 is($content->{message}, 'User data is updated', 'get response message when data is successfully updated');
 
-my $user = { username => 'Tom123', password => $new_password };
-$json_data = to_json($user);
-$res = $test->request(DELETE '/users/0', 
-    'Content_Type' => 'application/json',
-    'Content' => $json_data,
-    'Authorization' => 'Basic '.$new_userdata->{username} . $new_password,
-);
-is($res->code, 400, 'get correct error response code when ID is incorrect');
-$content = from_json($res->content);
-is($content->{error}, 'Cannot find user', 'get error message when user ID is incorrect');
+# my $user = { username => 'Tom123', password => $new_password };
+# $json_data = to_json($user);
+# $res = $test->request(DELETE '/users/0', 
+#     'Content_Type' => 'application/json',
+#     'Content' => $json_data,
+#     'Authorization' => 'Basic '.$new_userdata->{username} . $new_password,
+# );
+# is($res->code, 400, 'get correct error response code when ID is incorrect');
+# $content = from_json($res->content);
+# is($content->{error}, 'Cannot find user', 'get error message when user ID is incorrect');
 
-$res = $test->request(DELETE '/users/5',
-    'Content_Type' => 'application/json',
-    'Content' => $json_data,
-    'Authorization' => 'Basic '.$new_userdata->{username} . $new_password,
-);
+# $res = $test->request(DELETE '/users/5',
+#     'Content_Type' => 'application/json',
+#     'Content' => $json_data,
+#     'Authorization' => 'Basic '.$new_userdata->{username} . $new_password,
+# );
 
-is($res->code, 204, 'get correct response code');
+# is($res->code, 204, 'get correct response code');
 
 END {
     BloggyTest->rollback_data();
