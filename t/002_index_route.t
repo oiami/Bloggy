@@ -16,6 +16,7 @@ use JSON;
 use JSON::WebToken;
 use HTTP::Request::Common;
 use Secret::Simple;
+use Data::Dumper;
 
 my $app = Bloggy->to_app;
 is( ref $app, 'CODE', 'Got app' );
@@ -33,6 +34,7 @@ my $res  = $test->request(
 
 my $content = from_json($res->content);
 my $token = $content->{token};
+
 ok( $token, 'get token' );
 
 

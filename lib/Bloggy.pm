@@ -4,6 +4,7 @@ use warnings;
 
 use Dancer2;
 use Dancer2::Plugin::Database;
+use Dancer2::Plugin::Auth::JWT;
 use JSON::Schema::AsType;
 use JSON::WebToken;
 use Data::Dumper;
@@ -24,85 +25,19 @@ post '/login' => sub {
         password => param('password') 
     });
 
-    my $dt = DateTime->now()->add( days => 1 );
-    $dt = $dt->epoch;
-
     if ( $result ){
-        my $jwt = JSON::WebToken->encode({
-            id        => $result->{id},
+        my $token = generate_token({
+            id  => $result->{id},
             firstname => $result->{firstname},
             lastname  => $result->{lastname},
-            exp       => $dt,
-        }, $result->{email});
-
-        return { token => $jwt };
+        });
+        return { token => $token };
     } else {
         status '401';
         halt({ error => 'Unauthorized user'});
     }
 
 };
-
-sub _validate_request {
-    my $request = shift;
-    my $authorization = $request->headers->{'authorization'};
-    my ($auth_method, $token) = split(' ', $authorization);
-    
-    if( $auth_method ne 'Bearer' ){
-        status 400;
-        halt({ error => 'Unauthorized' });
-    }
-    
-    my $secret = $request->param('secret');
-
-    eval {
-        my $claims = JSON::WebToken->decode( $token, $secret );
-        my $now = DateTime->now()->add(days => 2)->epoch;
-        my $exp = $claims->{exp};
-
-        if($now <= $exp){
-            status '400';
-            halt({ error => 'Token Expired' });
-        }
-        print Dumper($claims);
-        return $claims->{id}; 
-    };
-    if ($@) {
-        status 500;
-        halt({ error => "$@" });
-    }
-}
-
-post '/signin' => sub {
-    my $token = param('token');
-    my $secret = param('secret');
-
-    my $id = _validate_request(request);
-    
-    if( validate_request($token, $secret )){
-        return { claims => 'ok' };
-    }
-
-    # return { claim => $claims };
-};
-
-# http_basic_auth_set_check_handler sub {
-#     my $username = param('username') || "";
-#     my $password = param('password') || "";
-
-#     my $result = database->quick_select('user', {
-#         username => $username, 
-#         password => $password 
-#     });
-
-#     if ( $result ){
-#         session userid => $result->{id};
-#         return 1;
-#     } else {
-#         status '401';
-#         halt({ error => 'Access denied'});
-#     }
-# };
 
 post '/users' => sub {
     my $userdata = params;
@@ -158,9 +93,9 @@ get '/users/:id' => sub {
 
 put '/users/:id' => sub {
     my $new_userdata = param('user');
-    my $userid = _validate_request(request);
+    my $user = authorize_user();
+    if( $user ){
 
-    if( $userid ){
         my $content_type = request->header('Content-Type') || "";
 
         unless ($content_type eq 'application/json'){
@@ -168,7 +103,7 @@ put '/users/:id' => sub {
         }
 
         #user id from data should match user retrieve from data base
-        unless ( param('id') eq $userid ) {
+        unless ( param('id') eq $user->{id} ) {
             status '400';
             return { error => 'Cannot find user' };
         }
@@ -184,30 +119,30 @@ put '/users/:id' => sub {
     }
 };
 
-del '/users/:id' => http_basic_auth required => sub {
-
-    my $result = database->quick_delete('user', { id => param('id') });
-    my $userid = session('userid');
-    #user id from data should match user retrieve from data base
-    unless ( param('id') eq $userid ) {
-        status '400';
-        return { error => 'Cannot find user' };
+del '/users/:id' => sub {
+    my $user =  authorize_user();
+    if ( $user ){
+        #user id from data should match user retrieve from data base         
+        unless ( param('id') eq $user->{id} ) {
+            status '400';
+            return { error => 'Cannot find user' };
+        }
+        my $result = database->quick_delete('user', { id => param('id') });
+        
+        if ($result == 1){
+            status '204';
+            return {};
+        }
+        else {
+            status '400';
+            return { error => 'Cannot delete user' };
+        }
     }
-
-    if ($result == 1){
-        status '204';
-        return {};
-    }
-    else {
-        status '400';
-        return { error => 'Cannot delete user' };
-    }
-
 };
 
 #=================Blog========================
 
-post '/blogs' => http_basic_auth required => sub {
+post '/blogs' => sub {
     my $blogdata = param('blog');
     my $content_type = request->header('Content-Type');
     my $author = session('userid');
@@ -257,7 +192,7 @@ get '/blogs/:id' => sub {
     return $data;
 };
 
-put '/blogs/:id' => http_basic_auth required => sub {
+put '/blogs/:id' => sub {
     my $new_blogdata = param('blog');
 
     my $content_type = request->header('Content-Type') || '';
@@ -285,7 +220,7 @@ put '/blogs/:id' => http_basic_auth required => sub {
 
 };
 
-del '/blogs/:id' => http_basic_auth required => sub {
+del '/blogs/:id' => sub {
 
     my $author = session('userid');
 
@@ -306,7 +241,7 @@ del '/blogs/:id' => http_basic_auth required => sub {
 
 #====================Posts=======================================
 
-post '/blogs/:blogid/posts' => http_basic_auth required => sub {
+post '/blogs/:blogid/posts' => sub {
     my $postdata = param('post');
 
     my $content_type = request->header('Content-Type');
@@ -361,7 +296,7 @@ get '/blogs/:blogid/posts/:id' => sub {
     return $data;
 };
 
-put '/blogs/:blogid/posts/:id' => http_basic_auth required => sub {
+put '/blogs/:blogid/posts/:id' => sub {
     my $new_postdata = param('post');
 
     my $content_type = request->header('Content-Type') || '';
@@ -390,7 +325,7 @@ put '/blogs/:blogid/posts/:id' => http_basic_auth required => sub {
     }
 };
 
-del '/blogs/:blogid/posts/:id' => http_basic_auth required => sub {
+del '/blogs/:blogid/posts/:id' => sub {
     my $author = session('userid');
 
     my $blog = database->quick_select('blog', { id => param('blogid'), author => $author });
@@ -411,7 +346,7 @@ del '/blogs/:blogid/posts/:id' => http_basic_auth required => sub {
 
 #=================Comments=================================
 
-post '/posts/:postid/comments' => http_basic_auth required => sub {
+post '/posts/:postid/comments' => sub {
     my $commentdata = param('comment');
 
     $commentdata->{author} = session('userid');
@@ -460,7 +395,7 @@ get '/posts/:post/comments/:id' => sub {
     return $data;
 };
 
-put '/posts/:post/comments/:id' => http_basic_auth required => sub {
+put '/posts/:post/comments/:id' => sub {
     my $new_comment = param('comment');
 
     my $post_id    = param('post');
@@ -488,7 +423,7 @@ put '/posts/:post/comments/:id' => http_basic_auth required => sub {
 
 };
 
-del '/posts/:post/comments/:id' => http_basic_auth required => sub {
+del '/posts/:post/comments/:id' => sub {
     my $post_id = param('post');
     my $id      = param('id');
     my $author  = session('userid');
